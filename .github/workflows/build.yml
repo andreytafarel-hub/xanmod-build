@@ -21,23 +21,24 @@ jobs:
       - name: Clone XanMod 6.18
         run: |
           # Клонируем напрямую с GitLab ветку 6.18
-          git clone --depth 1 https://gitlab.com -b 6.18-xanmod kernel
+          git clone --depth 1 https://gitlab.com/xanmod/linux.git -b 6.18-xanmod kernel
 
-      - name: Build RPM Packages
+      - name: Configure and Build RPM
         run: |
           cd kernel
+          # Используем стандартный конфиг XanMod
           make defconfig
-          # Включаем оптимизацию v3 (специально для Skylake/i5-6200U)
+          # Включаем оптимизацию x86-64-v3 (идеально для i5-6200U Skylake)
           ./scripts/config --enable CONFIG_X86_64_VERSION_3
-          # Отключаем лишнее для стабильности сборки
+          # Отключаем лишнее для стабильности и скорости сборки
           ./scripts/config --disable CONFIG_MODULE_SIG
           ./scripts/config --disable CONFIG_DEBUG_INFO
           make olddefconfig
-          # Сборка RPM (ядро, devel, headers) - это займет около 2 часов
+          # Сборка RPM (ядро, devel, headers). Займет ~2 часа.
           make binrpm-pkg -j$(nproc)
 
-      - name: Upload Artifacts
+      - name: Upload Results
         uses: actions/upload-artifact@v4
         with:
-          name: XanMod-6.18-RPMs
+          name: XanMod-6.18-Fedora43-RPMs
           path: ~/rpmbuild/RPMS/x86_64/*.rpm
