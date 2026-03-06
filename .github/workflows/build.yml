@@ -1,0 +1,35 @@
+name: Build XanMod 6.18 for Fedora 43
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Maximize build space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          
+      - name: Run Build in Fedora Container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: fedora:43
+          options: -v ${{ github.workspace }}:/work
+          run: |
+            dnf install -y rpm-build rpmdevtools git wget ncurses-devel hmaccalc zstd openssl-devel bison flex elfutils-libelf-devel dwarves perl-devel python3-devel gcc make patch diffutils
+            cd /work
+            wget https://gitlab.com
+            tar -xzf linux-6.18-xanmod1.tar.gz
+            cd linux-6.18-xanmod1
+            make defconfig
+            scripts/config --enable CONFIG_X86_64_VERSION_3
+            make olddefconfig
+            # Эта команда создает ВСЕ пакеты: ядро, devel и headers
+            make binrpm-pkg -j$(nproc)
+            cp /root/rpmbuild/RPMS/x86_64/*.rpm /work/
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: XanMod-6.18-Packages
+          path: ./*.rpm
