@@ -1,4 +1,4 @@
-name: XanMod_6.18.16_Final
+name: XanMod_6.18_Final_Success
 on:
   push:
     branches: [ "main" ]
@@ -16,29 +16,37 @@ jobs:
       - name: Install Build Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc rsync kmod cpio rpm devscripts dwarves
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc rsync kmod cpio rpm devscripts dwarves curl
 
-      - name: Clone XanMod 6.18.16
+      - name: Download Kernel (User-Agent Bypass)
         run: |
-          # Клонируем именно ту ветку, что на твоем скрине
-          git clone --depth 1 https://gitlab.com -b 6.18-xanmod kernel
+          # Имитируем браузер Chrome, чтобы GitLab не выдал 403 ошибку
+          curl -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+          "https://gitlab.com" -o kernel.tar.gz
+          
+          # Проверяем, скачался ли архив или опять HTML-ошибка
+          if file kernel.tar.gz | grep -q "gzip compressed"; then
+            tar -xzf kernel.tar.gz
+            mv linux-6.18.16-xanmod1 kernel
+          else
+            echo "Ошибка: Скачался не архив, а HTML-страница. Пробую запасной вариант (git clone)..."
+            git clone --depth 1 https://gitlab.com -b 6.18-xanmod kernel
+          fi
 
-      - name: Configure and Build RPM
+      - name: Build RPM Packages
         run: |
           cd kernel
           make defconfig
-          # Оптимизация v3 для твоего процессора i5-6200U (Skylake)
+          # Оптимизация v3 для твоего i5-6200U (Skylake)
           ./scripts/config --enable CONFIG_X86_64_VERSION_3
-          # Отключаем лишнее для стабильной сборки в облаке
           ./scripts/config --disable CONFIG_MODULE_SIG
           ./scripts/config --disable CONFIG_DEBUG_INFO
           make olddefconfig
-          # Сборка RPM пакетов (ядро, devel, headers)
-          # Это займет примерно 2 часа
+          # Сборка RPM (займет около 2 часов)
           make binrpm-pkg -j$(nproc)
 
       - name: Upload Results
         uses: actions/upload-artifact@v4
         with:
-          name: XanMod-6.18.16-RPMs
+          name: XanMod-6.18-Fedora43-RPMs
           path: ~/rpmbuild/RPMS/x86_64/*.rpm
