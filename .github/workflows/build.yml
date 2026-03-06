@@ -1,20 +1,50 @@
+name: Build XanMod 6.18 for Fedora 43
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Maximize build space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          
+      - name: Run Build in Fedora Container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: fedora:rawhide
+          options: -v ${{ github.workspace }}:/work
           run: |
-            # 1. Установка инструментов
+            # 1. Установка инструментов сборки
             dnf install -y rpm-build rpmdevtools git wget ncurses-devel hmaccalc zstd openssl-devel bison flex elfutils-libelf-devel dwarves perl-devel python3-devel gcc make patch diffutils
             
             cd /work
-            # 2. Клонируем только нужную ветку (это надежнее архива)
+            # 2. Клонируем ветку 6.18 напрямую (надежнее архива)
             git clone --depth 1 https://gitlab.com -b 6.18-xanmod linux-xanmod
             cd linux-xanmod
             
-            # 3. Настройка под i5-6200U (Skylake)
+            # 3. Настройка под твой i5-6200U (Skylake / v3)
             make defconfig
             scripts/config --enable CONFIG_X86_64_VERSION_3
             scripts/config --set-str CONFIG_X86_64_VERSION_3_NAME "v3"
+            # Принудительно включаем поддержку i915 (Intel) и Nouveau/NVIDIA для гибрида
+            scripts/config --enable CONFIG_DRM_I915
+            scripts/config --module CONFIG_DRM_NOUVEAU
             make olddefconfig
             
-            # 4. Сборка (ядро, devel, headers)
+            # 4. Сборка всех RPM пакетов (ядро, devel, headers)
+            # Это самый долгий этап (около 2 часов)
             make binrpm-pkg -j$(nproc)
             
-            # 5. Копируем результат
+            # 5. Копируем результат для выгрузки
             cp /root/rpmbuild/RPMS/x86_64/*.rpm /work/
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: XanMod-6.18-Fedora43-Skylake
+          path: ./*.rpm
