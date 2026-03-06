@@ -16,11 +16,11 @@ jobs:
       - name: Install Build Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc rsync kmod cpio rpm devscripts
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc rsync kmod cpio rpm devscripts dwarves
 
       - name: Clone XanMod
         run: |
-          # Исправленная полная ссылка на репозиторий
+          # Теперь ссылка полная и правильная
           git clone --depth 1 https://github.com -b 6.18-xanmod kernel
           
       - name: Configure and Build
@@ -29,8 +29,11 @@ jobs:
           make defconfig
           # Оптимизация под твой i5-6200U (v3)
           scripts/config --enable CONFIG_X86_64_VERSION_3
+          # Отключаем подпись модулей, чтобы не было ошибки без ключей
+          scripts/config --disable CONFIG_MODULE_SIG
+          scripts/config --disable CONFIG_DEBUG_INFO
           make olddefconfig
-          # Сборка RPM пакетов
+          # Сборка RPM пакетов (ядро, devel, headers)
           make binrpm-pkg -j$(nproc)
 
       - name: Upload Artifacts
