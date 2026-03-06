@@ -13,23 +13,35 @@ jobs:
       - name: Run Build in Fedora Container
         uses: addnab/docker-run-action@v3
         with:
-          image: fedora:43
+          image: fedora:rawhide
           options: -v ${{ github.workspace }}:/work
           run: |
+            # 1. Установка инструментов сборки
             dnf install -y rpm-build rpmdevtools git wget ncurses-devel hmaccalc zstd openssl-devel bison flex elfutils-libelf-devel dwarves perl-devel python3-devel gcc make patch diffutils
+            
             cd /work
-            wget https://gitlab.com
-            tar -xzf linux-6.18-xanmod1.tar.gz
-            cd linux-6.18-xanmod1
+            # 2. Скачивание архива (флаг -L для редиректов и -O для точного имени)
+            wget -L https://gitlab.com -O xanmod.tar.gz
+            
+            # 3. Распаковка
+            tar -xzf xanmod.tar.gz
+            cd linux-6.18.2-xanmod1
+            
+            # 4. Настройка под i5-6200U (Skylake)
             make defconfig
             scripts/config --enable CONFIG_X86_64_VERSION_3
+            scripts/config --set-str CONFIG_X86_64_VERSION_3_NAME "v3"
             make olddefconfig
-            # Эта команда создает ВСЕ пакеты: ядро, devel и headers
+            
+            # 5. Сборка всех RPM пакетов (ядро, devel, headers)
+            # Это займет 1.5 - 2.5 часа
             make binrpm-pkg -j$(nproc)
+            
+            # 6. Подготовка файлов для выгрузки
             cp /root/rpmbuild/RPMS/x86_64/*.rpm /work/
 
       - name: Upload Results
         uses: actions/upload-artifact@v4
         with:
-          name: XanMod-6.18-Packages
+          name: XanMod-6.18-Fedora43-Skylake
           path: ./*.rpm
