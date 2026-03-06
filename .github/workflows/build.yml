@@ -1,4 +1,4 @@
-name: XanMod Build 6.18
+name: XanMod_Build_Final
 on:
   push:
     branches: [ "main" ]
@@ -6,38 +6,38 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - name: Free Disk Space
+      - name: Free Space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo rm -rf "/usr/local/share/boost"
 
-      - name: Install Build Tools
+      - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc rsync kmod cpio rpm devscripts dwarves
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc rsync kmod cpio rpm devscripts dwarves curl
 
-      - name: Clone XanMod
+      - name: Download Kernel
         run: |
-          # Теперь ссылка полная и правильная
-          git clone --depth 1 https://github.com -b 6.18-xanmod kernel
-          
-      - name: Configure and Build
+          # Используем curl с флагом -L (перенаправления) и -o (имя файла)
+          curl -L "https://gitlab.com" -o kernel.tar.gz
+          tar -xzf kernel.tar.gz
+          # Переименовываем папку в 'kernel' для удобства
+          mv linux-6.18.16-xanmod1 kernel
+
+      - name: Build RPM
         run: |
           cd kernel
           make defconfig
-          # Оптимизация под твой i5-6200U (v3)
-          scripts/config --enable CONFIG_X86_64_VERSION_3
-          # Отключаем подпись модулей, чтобы не было ошибки без ключей
-          scripts/config --disable CONFIG_MODULE_SIG
-          scripts/config --disable CONFIG_DEBUG_INFO
+          ./scripts/config --enable CONFIG_X86_64_VERSION_3
+          ./scripts/config --disable CONFIG_MODULE_SIG
+          ./scripts/config --disable CONFIG_DEBUG_INFO
           make olddefconfig
-          # Сборка RPM пакетов (ядро, devel, headers)
           make binrpm-pkg -j$(nproc)
 
-      - name: Upload Artifacts
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: XanMod-RPMs
+          name: XanMod-6.18.16-RPMs
           path: ~/rpmbuild/RPMS/x86_64/*.rpm
