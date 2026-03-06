@@ -1,47 +1,20 @@
-name: Build XanMod 6.18 for Fedora 43
-on: [workflow_dispatch]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Maximize build space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          
-      - name: Run Build in Fedora Container
-        uses: addnab/docker-run-action@v3
-        with:
-          image: fedora:rawhide
-          options: -v ${{ github.workspace }}:/work
           run: |
-            # 1. Установка инструментов сборки
+            # 1. Установка инструментов
             dnf install -y rpm-build rpmdevtools git wget ncurses-devel hmaccalc zstd openssl-devel bison flex elfutils-libelf-devel dwarves perl-devel python3-devel gcc make patch diffutils
             
             cd /work
-            # 2. Скачивание архива (флаг -L для редиректов и -O для точного имени)
-            wget -L https://gitlab.com -O xanmod.tar.gz
+            # 2. Клонируем только нужную ветку (это надежнее архива)
+            git clone --depth 1 https://gitlab.com -b 6.18-xanmod linux-xanmod
+            cd linux-xanmod
             
-            # 3. Распаковка
-            tar -xzf xanmod.tar.gz
-            cd linux-6.18.2-xanmod1
-            
-            # 4. Настройка под i5-6200U (Skylake)
+            # 3. Настройка под i5-6200U (Skylake)
             make defconfig
             scripts/config --enable CONFIG_X86_64_VERSION_3
             scripts/config --set-str CONFIG_X86_64_VERSION_3_NAME "v3"
             make olddefconfig
             
-            # 5. Сборка всех RPM пакетов (ядро, devel, headers)
-            # Это займет 1.5 - 2.5 часа
+            # 4. Сборка (ядро, devel, headers)
             make binrpm-pkg -j$(nproc)
             
-            # 6. Подготовка файлов для выгрузки
+            # 5. Копируем результат
             cp /root/rpmbuild/RPMS/x86_64/*.rpm /work/
-
-      - name: Upload Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: XanMod-6.18-Fedora43-Skylake
-          path: ./*.rpm
